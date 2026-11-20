@@ -12,6 +12,21 @@ Store a complete `.env`, JSON configuration, an individual API key, or a note as
 
 You can also create a separate vault containing only the keys needed for a particular task and share that encrypted file. Communicate its password separately.
 
+## Build from source
+
+Build the desktop and command-line binary from the repository root:
+
+```bash
+cd src
+go build -o faraday main.go
+```
+
+To build the Linux D-Bus daemon, run this from the same `src` directory:
+
+```bash
+go build -o faradayd dbus_linux.go
+```
+
 ## Desktop UI
 
 Create or open a vault, browse namespaces and entries in the tree, and edit their content in the text editor. Use the toolbar to save, save as a separate vault, or save with a new password.
@@ -101,6 +116,50 @@ npm run dev
 
 Faraday prompts for the master password through the terminal. The application starts only if the entry is retrieved successfully.
 The .env file contains plaintext while the application runs. Cleanup cannot be guaranteed after SIGKILL, a system crash, or power loss. If a file remains, the next run refuses to overwrite it.
+
+## D-Bus daemon (Linux)
+
+Use `faradayd` to give local scripts and applications access to selected vault entries over the user D-Bus session. The daemon prompts for the master password once at startup.
+
+### Prepare the vault and config
+
+1. Run `./faraday` from `src` to open the desktop UI.
+2. Create a vault, add the entries you want to use, and save the vault with a master password.
+3. Create a JSON config with the vault path and the exact entry paths the daemon may return. An example config is also available in `src`.
+
+```json
+{
+    "vault_path": "path_to_vault",
+    "allowed_keys": [
+        "tokens/gh",
+        "some_other/secret"
+    ]
+}
+```
+
+### Start the daemon
+
+```bash
+./faradayd --config path_to_config
+```
+
+Enter the vault password when prompted. After startup, the daemon retains only the allowlisted entries for lookup. The full decrypted vault and the master password are used during startup and are not retained by the service. Stop the daemon with `Ctrl+C`.
+
+### Read an entry over D-Bus
+
+The service and interface are both named `io.github.Tripod311.Faraday`. The object path is `/io/github/Tripod311/Faraday`. The `ReadKey` method takes a string in `namespace/name` form and returns the entry content as a string.
+
+From another terminal in the same user session, run:
+
+```bash
+busctl --user call \
+    io.github.Tripod311.Faraday \
+    /io/github/Tripod311/Faraday \
+    io.github.Tripod311.Faraday \
+    ReadKey s 'tokens/gh'
+```
+
+The command prints the plaintext entry to the terminal. The daemon serves only the keys listed in `allowed_keys`. Any application that can call the service on your user D-Bus session can request those keys while the daemon is running.
 
 ## Encryption
 
