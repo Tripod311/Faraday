@@ -1,0 +1,7 @@
+{
+    "vault_path": "path_to_vault",
+    "allowed_keys": [
+        "tokens/gh",
+        "some_other/secret"
+    ]
+}
